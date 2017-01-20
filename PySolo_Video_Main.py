@@ -51,7 +51,7 @@ class mainNotebook(wx.Notebook):
 
         wx.Notebook.__init__(self, parent, id=-1, style=wx.NB_LEFT, name='NotebookNameStr')       # initialize notebook
 
-        self.cfg = Configuration(self, filename='')                         # get default configuration settings
+        self.cfg = Configuration(self)                         # get default configuration settings
         self.configPanel = configPanel(self, mon_num=1, cfg=self.cfg)                        # create configuration page
         self.AddPage(self.configPanel, 'Configuration')
 

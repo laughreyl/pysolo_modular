@@ -62,32 +62,34 @@ class Configuration(object):
             setValue(section, key, value)   sets the value for a configuration parameter and updates dictionary
     """
 
-    def __init__(self, parent, filePathName=None):
+    def __init__(self, parent, dirName=None, fileName=None):
         """
         Sets up a default configuration object and dictionary.
         """
         object.__init__(self)
 
         self.parent = parent
-        self.filePathName = filePathName
+
 
         """ -------------------------------------------------------------------------- configuration keywords """
-        self.opt_keys = ['webcams', 'thumbnailsize', 'fullsize',  'fps_preview', 'monitors']
+        self.opt_keys = ['webcams', 'thumbnailsize', 'fullsize',  'fps_preview', 'monitors', 'cfgfolder']
         self.mon_keys = ['sourcetype','issdmonitor', 'source','fps_recording','start_datetime',
                          'track','tracktype','maskfile','datafolder']
 
+
         """ --------------------------------------------------------------------- create the ConfigParser object """
         self.cfg = ConfigParser.RawConfigParser()             # create the ConfigParser object
+        self.default_cfg()                                  # start with a default configuration dictionary
 
         """ ------------------------------------- verify that provided filename exists or create default file name  """
-        self.cfgGetFilePathName(self.parent, self.filePathName)
+        self.cfgGetFilePathName(self.parent, dirName, fileName)
 
         try:
             self.cfg.read(self.filePathName)                # read the selected configuration file
         except:                                             # otherwise make config object from cfg_dict
             print('$$$$$$ Invalid configuration file.  Creating default.')
-            self.default_cfg()                              # start with a default configuration dictionary
-            self.cfgSaveAs()  # save the configuration
+            self.dict_to_cfgObject(self.cfg_dict)                        # apply the default configuration to the cfg object
+            self.cfgSaveAs()                                # save the configuration
 
         self.cfg_to_dicts()                             # overwrites default cfg_dict with file cfg values if they exist
 
@@ -97,26 +99,32 @@ class Configuration(object):
         Dictionary and cfg object will be created but NOT saved.
         """
         print('$$$$$$ Generating default configuration')
+        self.defaultDir = os.path.join(expanduser('~'), 'Documents', 'PySolo_Files')
+
+        if not(os.path.isdir(self.defaultDir)):
+            os.mkdir(self.defaultDir)     # make sure default dir exists
 
         self.cfg_dict = [{                               # create the default config dictionary
             'webcams': 0,                                   # element 0 is the options dictionary
             'monitors': 1,
             'thumbnailsize': (320, 240),
             'fullsize': (640, 480),
-            'fps_preview': 5
+            'fps_preview': 5,
+            'cfgfolder': self.defaultDir
             },
             {                                       # all additional elements are the monitor dictionaries (1-indexed)
             'mon_name': 'Monitor1',  # include one default monitor
             'sourcetype': 1,
             'issdmonitor': False,
-            'source': os.path.join(expanduser('~'), 'Documents', 'source.avi'),
+            'source': os.path.join(self.defaultDir, 'source.avi'),
             'fps_recording': 1,
             'start_datetime': wx.DateTime_Now(),
             'track': False,
             'tracktype': 0,
-            'maskfile': os.path.join(expanduser('~'), 'Documents', 'mask.msk'),
-            'datafolder': expanduser('~')
+            'maskfile': os.path.join(self.defaultDir, 'mask.msk'),
+            'datafolder': self.defaultDir
         }]
+
 
         self.dict_to_cfgObject(self.cfg_dict)                        # make cfg object from dictionary
 
@@ -129,9 +137,7 @@ class Configuration(object):
         Remaining element's indices indicate monitor number.
         """
 
-        self.default_cfg()                            # create default dictionary in case any keys in cfg aren't set
-                                                        # keys that are in the cfg object will be reset
-
+        self.cfg_dict = [{}]                                      # start with empty list of dictionaries
     # Options:  cfg_dict[0]
 
         if not self.cfg.has_section('Options'):                      # make sure the options section exists in the cfg object
@@ -184,38 +190,29 @@ class Configuration(object):
                 self.cfg.set(mon_name, key, cfg_dict[mon_num][key])                 # monitors section
 
 # --------------------------------------------------------------------------------------  get config file path & name
-    def cfgGetFilePathName(self, parent, dirName='', fileName=None):
+    def cfgGetFilePathName(self, parent, dirName='', fileName=''):
         """
         Lets user select or create a config file.
         """
+        # if directory or file name are invalid, start file dialog
+        if (dirName is None) or (fileName is None) or (not(os.path.isfile(os.path.join(dirName, fileName)))):
 
-        if dirName is None:                               # no folder was specified: use home directory & ask for file
-            dirName = os.path.join(expanduser('~'), 'Documents')
-        elif not(os.path.isdir(dirName)):                     # specified directory is invalid: use home directory & ask for file
-            dirName = os.path.join(expanduser('~'), 'Documents')
+                wildcard = "PySolo Video config file (*.cfg)|*.cfg|" \
+                           "All files (*.*)|*.*"                # adding space in here will mess it up!
 
-        if fileName is None:                               # no file was specified
-            fileName = ''
+                dlg = wx.FileDialog(parent,
+                                    message="Open configuration file ...",
+                                    defaultDir=os.getcwd(),
+                                    wildcard=wildcard,
+                                    style=wx.OPEN
+                                    )
 
-        filePathName = os.path.join(dirName, fileName)       # join the path and filenames to check the filename
-        if not(os.path.isfile(filePathName)):                       # filename is not valid: query user
+                if not(dlg.ShowModal() == wx.ID_OK):  # show the file browser window
+                    return False
+                else:
+                    self.filePathName = dlg.GetPath()  # get the filepath from the save dialog
 
-            wildcard = "PySolo Video config file (*.cfg)|*.cfg|" \
-                       "All files (*.*)|*.*"                # adding space in here will mess it up!
-
-            dlg = wx.FileDialog(parent,
-                                message="Open configuration file ...",
-                                defaultDir=dirName,
-                                wildcard=wildcard,
-                                style=wx.OPEN
-                                )
-
-            if not(dlg.ShowModal() == wx.ID_OK):  # show the file browser window
-                return False
-            else:
-                self.filePathName = dlg.GetPath()  # get the filepath from the save dialog
-
-            dlg.Destroy()
+                dlg.Destroy()
 
         else:
             self.filePathName = os.path.join(dirName, fileName)
@@ -224,7 +221,7 @@ class Configuration(object):
 
 
     # %%  ----------------------------------------------------------------------------  Save config file
-    def cfgSaveAs(self, filePathName=''):
+    def cfgSaveAs(self):
         """
         Lets user select file and path where configuration will be saved. Saves using ConfigParser .write()
         """
@@ -235,7 +232,7 @@ class Configuration(object):
 
         dlg = wx.FileDialog(self.parent,
                             message="Save configuration as file ...",
-                            defaultDir=os.path.split(filePathName)[0],
+                            defaultDir=self.cfg_dict[0]['cfgfolder'],
                             wildcard=wildcard,
                             style=(wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
         )
@@ -280,10 +277,20 @@ class Configuration(object):
 
         r = self.cfg.get(section, key)
 
-        if key == 'start_datetime' :                                    # order of conditional test is important! do this first!
-            if type(r) == type(''):                     # string -> datetime value
-                try: r = parser.parse(r)
-                except: r = wx.DateTime_Now()
+        if key == 'start_datetime' :                            # order of conditional test is important! do this first!
+            if type(r) == type(wx.DateTime.Now()):
+                pass
+            elif type(r) == type(''):                     # string -> datetime value
+                try: r = self.string2wxdatetime(r)
+                except: r = wx.DateTime.Now()
+            elif type(r) == type(datetime.datetime.now()):
+                try: r= self.pydatetime2wxdatetime(r)
+                except: r = wx.DateTime.Now()
+            else:
+                r = wx.DateTime.Now()
+                print('$$$$$$ could not interpret start_datetime value')
+                return r
+
 
             return r
 
@@ -322,6 +329,17 @@ class Configuration(object):
 
         return r                                                             # all else has failed:  return as string
 
+# --------------------------------------------------------------------- convert python datetime.datetime to wx.datetime
+    def pydatetime2wxdatetime(self, pydt):
+        dt_iso = pydt.isoformat()
+        wxdt = wx.DateTime()
+        wxdt.ParseISOCombined(dt_iso, sep='T')
+        return wxdt
+
+    def string2wxdatetime(self, strdt):
+        wxdt = wx.DateTime()
+        wxdt.ParseDateTime(strdt)
+        return wxdt
 
 # ------------------------------------------------------------------------------------------ Stand alone test code
 

@@ -180,7 +180,7 @@ class FileBrowseButton(wx.Panel):
         """set current value of text control"""
         save = self.callCallback
         self.callCallback = callBack
-        self.textControl.SetValue(os.path.split(value)[1])
+        self.textControl.SetValue(value) #          os.path.split(value)[1])
         self.callCallback = save
 
     def GetLabel(self):

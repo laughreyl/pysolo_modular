@@ -7,13 +7,13 @@ from filebrowsebutton_LL import FileBrowseButton, DirBrowseButton
 
 class acquirePanel(wx.Panel):
 
-    def __init__(self, parent, cfg):
+    def __init__(self, parent, cfg, size=(800,200)):
 
-        wx.Panel.__init__(self, parent)
+        wx.Panel.__init__(self, parent, size=size)
 
         self.cfg_dict = cfg.cfg_dict
         self.n_mons = self.cfg_dict[0]['monitors']
-        self.colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track']
+        self.colLabels = ['Monitor', 'Track type', 'Track', 'Source', 'Mask', 'Output']
 
     # create the table
         self.acqGrid = gridlib.Grid(self)
@@ -25,22 +25,43 @@ class acquirePanel(wx.Panel):
         self.updateTable()                        # fill the table using config info
 
         acqSizer = wx.BoxSizer(wx.VERTICAL)
+
         acqSizer.Add(self.acqGrid, 1, wx.EXPAND)
+
         self.SetSizer(acqSizer)
 
     def updateTable(self):
 
-        colKeys = ['source', 'maskfile', 'datafolder', 'tracktype', 'track']
+#        columns are: 'monitor', 'source', 'maskfile', 'output', 'tracktype', 'track'
 
-        for mon_num in range(1, self.n_mons +1):                        # mon_num is 1-indexed
-            for colnum in range(0, len(self.colLabels)):
+        for mon_num in range(1, self.n_mons +1):                                # mon_num is 1-indexed
+            # monitor name
+            self.acqGrid.SetCellValue(mon_num - 1, 0, 'Monitor %d' % mon_num)   # row numbers are 0-indexed
 
-                if self.colLabels[colnum] == 'Output':
-                    value = 'Monitor%d.txt' % mon_num
-                else:
-                    value = str(self.cfg_dict[mon_num][colKeys[colnum]])
+            sourcefile = os.path.split(self.cfg_dict[mon_num]['source'])[1]
+            self.acqGrid.SetCellValue(mon_num - 1, 3, sourcefile)
 
-                self.acqGrid.SetCellValue(mon_num-1, colnum, value)   # row numbers are 0-indexed
+            maskfile = os.path.split(self.cfg_dict[mon_num]['maskfile'])[1]
+            self.acqGrid.SetCellValue(mon_num - 1, 4, maskfile)
+
+            # output file name
+            outfolder = os.path.join(self.cfg_dict[mon_num]['datafolder'], ('Monitor%d.txt' % mon_num))
+            self.acqGrid.SetCellValue(mon_num - 1, 5, outfolder)
+
+            # track type
+            tracktype = self.cfg_dict[mon_num]['tracktype']
+            if tracktype == 0: tracktype = 'Distance'
+            elif tracktype == 1: tracktype = 'Virtual BM'
+            elif tracktype == 2: tracktype = 'Position'
+            self.acqGrid.SetCellValue(mon_num - 1, 1, tracktype)
+
+            # track
+            track = self.cfg_dict[mon_num]['track']
+            self.acqGrid.SetCellValue(mon_num - 1, 2, str(track))
+
+            self.acqGrid.AutoSizeColumns(setAsMin=True)                     # set column width automatically
+            self.acqGrid.EnableEditing(False)                               # user should not make changes here TODO: allow changes from Acquire?
+            self.acqGrid.Fit()
 
 # ------------------------------------------------------------------------------------------ Stand alone test code
 #  insert other classes above and call them in mainFrame
@@ -49,10 +70,10 @@ class mainFrame(wx.Frame):
 
     def __init__(self, *args, **kwds):
 
-        wx.Frame.__init__(self, *args, **kwds)
+        wx.Frame.__init__(self, None, id=wx.ID_ANY, size=(1000,200))
 
         cfg = Configuration(self)
-        acquirePanel(self, cfg)
+        acquirePanel(self, cfg, size=(1000, 300))
 
 
 
